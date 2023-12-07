@@ -1,35 +1,41 @@
 const createError = require('http-errors');
 const dotenv = require('dotenv')
 const express = require('express');
+const app = express();
+const jwt = require('jsonwebtoken')
 const passport = require('passport')
 const session = require('express-session')
+const {loginCheck} = require('./auth/passport')
+// loginCheck(passport)
+const flash = require('connect-flash')
+
+const connectDB = require('./model/connection/connection');
+connectDB()
 
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 
-
-const {loginCheck} = require('./auth/passport')
-loginCheck(passport)
-
-dotenv.config({path:'config.env'})
-//const nocache = require('nocache')
-const PORT = process.env.PORT || 4000;
-const app = express();
-
-app.use(passport.initialize());
 app.use(session({
   secret:"oneboy",
   saveUninitialized:false,
   resave:false
 }))
 
-const connectDB = require('./model/connection/connection')
+dotenv.config({path:'config.env'})
+//const nocache = require('nocache')
+const PORT = process.env.PORT || 4000;
 
-connectDB()
+app.use(flash())
+app.use(passport.initialize());
+app.use(passport.session())
 
-// main router
-const routes = require('./routes/routes');
+app.use((req, res, next) => {
+  res.locals.message = req.flash('successMessage');
+  res.locals.message = req.flash('errorMessage');
+  res.locals.user = req.user;
+  next();
+});
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -41,15 +47,33 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// main router
+const routes = require('./routes/adminRutes');
+const userRoutes = require('./routes/userroutes');
+app.use('/admin',routes);
+app.use('/brepublic',userRoutes)
 
+//cookies
+app.get('/set-cookies',(req,res)=>{
 
-//main route
-app.use('/',routes);
-// app.use(nocache());
+  // res.setHeader('Set-Cookie','newUser=true')
+  res.cookie('newUser',false)
+  res.cookie('newEmploy',true,{ maxAge: 1000 * 60 * 60 * 24, httpOnly: true })
+  res.send('you get the cookie')
+})
 
+app.get('/read-cookies',(req,res)=>{
+
+  const cookies = req.cookies;
+  console.log(cookies)
+  
+  res.json(cookies)
+
+})
 
 app.listen(PORT,()=>{
   console.log(`server is running on http://localhost:${PORT}/admin/login`)
+  console.log(`server is running on http://localhost:${PORT}/brepublic/landing`)
 })
 
 
